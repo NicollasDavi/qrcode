@@ -15,15 +15,47 @@ export default function QRCodeScanner() {
   const [scannedVehicleId, setScannedVehicleId] = useState<string | null>(null)
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const scannerContainerRef = useRef<HTMLDivElement>(null)
+  const isStoppingRef = useRef(false) // Flag para evitar múltiplas chamadas simultâneas
 
   useEffect(() => {
+    // Handler global para capturar erros não tratados da biblioteca
+    const handleError = (event: ErrorEvent) => {
+      const errorMessage = event.message || event.error?.message || ''
+      // Ignorar erros conhecidos relacionados ao scanner
+      if (
+        errorMessage.includes('removeChild') ||
+        errorMessage.includes('not a child') ||
+        errorMessage.includes('AbortError') ||
+        errorMessage.includes('media was removed')
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+        return false
+      }
+    }
+
+    window.addEventListener('error', handleError)
+
     return () => {
+      window.removeEventListener('error', handleError)
+      
       // Cleanup ao desmontar o componente
       if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {
-          // Ignorar erros no cleanup
-        })
+        const scanner = scannerRef.current
         scannerRef.current = null
+        isStoppingRef.current = true
+        
+        // Tentar parar e limpar sem aguardar (não bloqueia unmount)
+        scanner.stop().catch(() => {
+          // Ignorar todos os erros no cleanup
+        }).finally(() => {
+          try {
+            scanner.clear()
+          } catch (e) {
+            // Ignorar
+          }
+          isStoppingRef.current = false
+        })
       }
     }
   }, [])
@@ -128,8 +160,18 @@ export default function QRCodeScanner() {
     if (scannerRef.current) {
       try {
         await stopScanning()
+        // Aguardar um pouco para garantir que o cleanup foi concluído
+        await new Promise(resolve => setTimeout(resolve, 500))
       } catch (e) {
         // Ignorar erros ao parar scanner anterior
+      }
+    }
+
+    // Verificar se já está parando
+    if (isStoppingRef.current) {
+      // Aguardar até que o stop termine
+      while (isStoppingRef.current) {
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
     }
 
@@ -139,12 +181,18 @@ export default function QRCodeScanner() {
       setMaintenanceData(null)
       setScannedVehicleId(null)
       
+      // Aguardar um frame para garantir que o DOM está atualizado
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      
       // Verificar se o elemento existe
       const containerElement = document.getElementById('scanner-container')
       if (!containerElement) {
         setError('Elemento do scanner não encontrado')
         return
       }
+
+      // Limpar qualquer conteúdo anterior no container
+      containerElement.innerHTML = ''
 
       const scanner = new Html5Qrcode('scanner-container')
       scannerRef.current = scanner
@@ -175,49 +223,71 @@ export default function QRCodeScanner() {
       setError('Erro ao iniciar a câmera. Verifique as permissões.')
       console.error(err)
       setScanning(false)
-      scannerRef.current = null
+      if (scannerRef.current) {
+        try {
+          scannerRef.current.clear()
+        } catch (e) {
+          // Ignorar
+        }
+        scannerRef.current = null
+      }
+      isStoppingRef.current = false
     }
   }
 
   const stopScanning = async () => {
+    // Evitar múltiplas chamadas simultâneas
+    if (isStoppingRef.current) {
+      return
+    }
+    
     if (!scannerRef.current) {
       setScanning(false)
+      isStoppingRef.current = false
       return
     }
 
+    isStoppingRef.current = true
     const scanner = scannerRef.current
     scannerRef.current = null // Limpar referência primeiro para evitar chamadas duplicadas
+    
+    // Atualizar estado primeiro
     setScanning(false)
 
     try {
-      // Verificar se o elemento ainda existe no DOM
-      const containerElement = document.getElementById('scanner-container')
-      if (!containerElement) {
-        // Elemento já foi removido, não precisa parar
-        return
-      }
-
-      await scanner.stop()
+      // Tentar parar o scanner com timeout para evitar travamento
+      await Promise.race([
+        scanner.stop(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 2000)
+        )
+      ])
     } catch (err: any) {
-      // Ignorar erros específicos relacionados a elementos já removidos ou câmera já parada
+      // Ignorar todos os erros relacionados a cleanup
+      // Esses erros são comuns quando o React já removeu os elementos
       const errorMessage = err?.message || err?.toString() || ''
+      // Não logar erros esperados relacionados a DOM/React
       if (
-        errorMessage.includes('removeChild') ||
-        errorMessage.includes('not a child') ||
-        errorMessage.includes('AbortError') ||
-        errorMessage.includes('media was removed') ||
-        errorMessage.includes('camera already stopped')
+        !errorMessage.includes('removeChild') &&
+        !errorMessage.includes('not a child') &&
+        !errorMessage.includes('AbortError') &&
+        !errorMessage.includes('media was removed') &&
+        !errorMessage.includes('camera already stopped') &&
+        !errorMessage.includes('No QR code') &&
+        !errorMessage.includes('Timeout')
       ) {
-        // Erros esperados - ignorar silenciosamente
-        return
+        // Só logar erros realmente inesperados
+        console.warn('Aviso ao parar scanner:', err)
       }
-      console.error('Erro ao parar scanner:', err)
+    }
+
+    // Sempre tentar limpar, mesmo se stop() falhou
+    try {
+      scanner.clear()
+    } catch (clearError) {
+      // Ignorar todos os erros de limpeza
     } finally {
-      try {
-        scanner.clear()
-      } catch (clearError) {
-        // Ignorar erros ao limpar (pode já estar limpo)
-      }
+      isStoppingRef.current = false
     }
   }
 
@@ -276,6 +346,7 @@ export default function QRCodeScanner() {
 
       <div
         id="scanner-container"
+        key={scanning ? 'scanning' : 'idle'}
         ref={scannerContainerRef}
         className={`w-full border border-gray-300 overflow-hidden ${
           scanning ? 'min-h-[300px]' : 'min-h-[200px] bg-gray-50 flex items-center justify-center'
