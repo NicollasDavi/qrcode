@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Vehicle } from '@/types/maintenance'
 import VehicleForm from '@/components/VehicleForm'
 import { generateVehicleId } from '@/utils/vehicleId'
+import { initializeSampleData } from '@/utils/sampleData'
 
 export default function Home() {
   const router = useRouter()
@@ -13,9 +14,16 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Inicializar dados de exemplo se não houver veículos
     const savedVehicles = localStorage.getItem('vehicles')
-    if (savedVehicles) {
-      const parsed = JSON.parse(savedVehicles)
+    if (!savedVehicles || JSON.parse(savedVehicles).length === 0) {
+      initializeSampleData()
+    }
+
+    // Carregar veículos
+    const vehiclesData = localStorage.getItem('vehicles')
+    if (vehiclesData) {
+      const parsed = JSON.parse(vehiclesData)
       setVehicles(parsed)
     }
     setLoading(false)
