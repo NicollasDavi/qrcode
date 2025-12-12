@@ -26,7 +26,8 @@ export default function QRCodeScanner() {
         errorMessage.includes('removeChild') ||
         errorMessage.includes('not a child') ||
         errorMessage.includes('AbortError') ||
-        errorMessage.includes('media was removed')
+        errorMessage.includes('media was removed') ||
+        errorMessage.includes('play() request was interrupted')
       ) {
         event.preventDefault()
         event.stopPropagation()
@@ -34,10 +35,28 @@ export default function QRCodeScanner() {
       }
     }
 
+    // Handler para promises rejeitadas não tratadas
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const errorMessage = event.reason?.message || event.reason?.toString() || ''
+      // Ignorar erros conhecidos relacionados ao scanner
+      if (
+        errorMessage.includes('AbortError') ||
+        errorMessage.includes('media was removed') ||
+        errorMessage.includes('play() request was interrupted') ||
+        errorMessage.includes('removeChild') ||
+        errorMessage.includes('not a child')
+      ) {
+        event.preventDefault()
+        return false
+      }
+    }
+
     window.addEventListener('error', handleError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
 
     return () => {
       window.removeEventListener('error', handleError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
       
       // Cleanup ao desmontar o componente
       if (scannerRef.current) {
@@ -197,29 +216,95 @@ export default function QRCodeScanner() {
       const scanner = new Html5Qrcode('scanner-container')
       scannerRef.current = scanner
 
-      await scanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
-        (decodedText) => {
-          // Processar resultado
-          const success = parseQRCodeResult(decodedText)
-          if (success) {
-            // Parar após ler com sucesso (com delay para evitar race conditions)
-            setTimeout(async () => {
-              await stopScanning()
-            }, 500)
-          }
-        },
-        (errorMessage) => {
-          // Ignora erros de leitura contínua
-        }
-      )
+      // Verificar novamente se o elemento ainda existe antes de iniciar
+      const containerCheck = document.getElementById('scanner-container')
+      if (!containerCheck) {
+        setError('Elemento do scanner foi removido')
+        scannerRef.current = null
+        return
+      }
 
-      setScanning(true)
+      // Wrapper para capturar erros de play() interrompido
+      try {
+        await Promise.race([
+          scanner.start(
+            { facingMode: 'environment' },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 },
+            },
+            (decodedText) => {
+              // Processar resultado
+              const success = parseQRCodeResult(decodedText)
+              if (success) {
+                // Parar após ler com sucesso (com delay para evitar race conditions)
+                setTimeout(async () => {
+                  await stopScanning()
+                }, 500)
+              }
+            },
+            (errorMessage) => {
+              // Ignora erros de leitura contínua
+            }
+          ),
+          // Timeout de segurança
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout ao iniciar câmera')), 10000)
+          )
+        ])
+        setScanning(true)
+      } catch (startError: any) {
+        // Verificar se é um erro esperado
+        const errorMessage = startError?.message || startError?.toString() || ''
+        if (
+          errorMessage.includes('AbortError') ||
+          errorMessage.includes('media was removed') ||
+          errorMessage.includes('play() request was interrupted') ||
+          errorMessage.includes('Timeout')
+        ) {
+          // Erro esperado - limpar e não mostrar ao usuário
+          if (scannerRef.current) {
+            try {
+              await scannerRef.current.stop()
+            } catch (e) {
+              // Ignorar
+            }
+            try {
+              scannerRef.current.clear()
+            } catch (e) {
+              // Ignorar
+            }
+            scannerRef.current = null
+          }
+          setScanning(false)
+          return
+        }
+        // Re-lançar erros inesperados
+        throw startError
+      }
     } catch (err: any) {
+      // Verificar se é um erro esperado relacionado a AbortError
+      const errorMessage = err?.message || err?.toString() || ''
+      if (
+        errorMessage.includes('AbortError') ||
+        errorMessage.includes('media was removed') ||
+        errorMessage.includes('play() request was interrupted')
+      ) {
+        // Erro esperado - apenas limpar sem mostrar ao usuário
+        setScanning(false)
+        if (scannerRef.current) {
+          try {
+            scannerRef.current.clear()
+          } catch (e) {
+            // Ignorar
+          }
+          scannerRef.current = null
+        }
+        isStoppingRef.current = false
+        return
+      }
+      
+      // Erro inesperado - mostrar ao usuário
       setError('Erro ao iniciar a câmera. Verifique as permissões.')
       console.error(err)
       setScanning(false)
