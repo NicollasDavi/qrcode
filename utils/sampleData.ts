@@ -2,10 +2,18 @@ import { Vehicle, VehicleMaintenanceData, Maintenance } from '@/types/maintenanc
 import { generateVehicleId } from './vehicleId'
 
 export function initializeSampleData() {
-  // Verificar se já existem veículos
-  const existingVehicles = localStorage.getItem('vehicles')
-  if (existingVehicles && JSON.parse(existingVehicles).length > 0) {
-    return // Não inicializar se já houver dados
+  // Garantir que está no cliente
+  if (typeof window === 'undefined') return
+
+  try {
+    // Verificar se já existem veículos
+    const existingVehicles = localStorage.getItem('vehicles')
+    if (existingVehicles && JSON.parse(existingVehicles).length > 0) {
+      return // Não inicializar se já houver dados
+    }
+  } catch (error) {
+    console.error('Erro ao verificar veículos existentes:', error)
+    return
   }
 
   const now = new Date()
@@ -388,14 +396,19 @@ export function initializeSampleData() {
     version: '1.0',
   }
 
-  // Salvar veículo
-  const vehicles = [sampleVehicle]
-  localStorage.setItem('vehicles', JSON.stringify(vehicles))
+  try {
+    // Salvar veículo
+    const vehicles = [sampleVehicle]
+    localStorage.setItem('vehicles', JSON.stringify(vehicles))
 
-  // Salvar dados do veículo
-  localStorage.setItem(`vehicle-data-${vehicleId}`, JSON.stringify(vehicleData))
-  localStorage.setItem(`vehicle-${vehicleId}`, JSON.stringify(vehicleData))
+    // Salvar dados do veículo
+    localStorage.setItem(`vehicle-data-${vehicleId}`, JSON.stringify(vehicleData))
+    localStorage.setItem(`vehicle-${vehicleId}`, JSON.stringify(vehicleData))
 
-  return vehicleId
+    return vehicleId
+  } catch (error) {
+    console.error('Erro ao inicializar dados de exemplo:', error)
+    return null
+  }
 }
 

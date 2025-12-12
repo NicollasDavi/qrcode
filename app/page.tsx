@@ -15,19 +15,27 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Inicializar dados de exemplo se não houver veículos
-    const savedVehicles = localStorage.getItem('vehicles')
-    if (!savedVehicles || JSON.parse(savedVehicles).length === 0) {
-      initializeSampleData()
-    }
+    // Garantir que está no cliente
+    if (typeof window === 'undefined') return
 
-    // Carregar veículos
-    const vehiclesData = localStorage.getItem('vehicles')
-    if (vehiclesData) {
-      const parsed = JSON.parse(vehiclesData)
-      setVehicles(parsed)
+    try {
+      // Inicializar dados de exemplo se não houver veículos
+      const savedVehicles = localStorage.getItem('vehicles')
+      if (!savedVehicles || JSON.parse(savedVehicles).length === 0) {
+        initializeSampleData()
+      }
+
+      // Carregar veículos
+      const vehiclesData = localStorage.getItem('vehicles')
+      if (vehiclesData) {
+        const parsed = JSON.parse(vehiclesData)
+        setVehicles(parsed)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar veículos:', error)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
   const handleSaveVehicle = (vehicleData: Omit<Vehicle, 'id' | 'createdAt' | 'lastUpdated'>) => {

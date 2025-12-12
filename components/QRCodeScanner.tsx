@@ -25,6 +25,9 @@ export default function QRCodeScanner() {
   }, [])
 
   const parseQRCodeResult = (text: string) => {
+    // Garantir que está no cliente
+    if (typeof window === 'undefined') return false
+
     try {
       const parsed = JSON.parse(text)
       
@@ -64,7 +67,7 @@ export default function QRCodeScanner() {
       // Verificar se é apenas um ID de veículo
       else if (isValidVehicleId(text)) {
         setScannedVehicleId(text)
-        const savedData = localStorage.getItem(`vehicle-data-${text}`)
+        const savedData = typeof window !== 'undefined' ? localStorage.getItem(`vehicle-data-${text}`) : null
         if (savedData) {
           try {
             const data: VehicleMaintenanceData = JSON.parse(savedData)
@@ -90,7 +93,7 @@ export default function QRCodeScanner() {
       // Se não for JSON, pode ser texto simples ou ID direto
       if (isValidVehicleId(text)) {
         setScannedVehicleId(text)
-        const savedData = localStorage.getItem(`vehicle-data-${text}`)
+        const savedData = typeof window !== 'undefined' ? localStorage.getItem(`vehicle-data-${text}`) : null
         if (savedData) {
           try {
             const data: VehicleMaintenanceData = JSON.parse(savedData)

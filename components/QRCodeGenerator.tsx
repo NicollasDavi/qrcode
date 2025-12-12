@@ -28,7 +28,9 @@ export default function QRCodeGenerator({
 
   // Garantir que o veículo tenha um ID único
   useEffect(() => {
-    if (vehicle) {
+    if (typeof window === 'undefined' || !vehicle) return
+
+    try {
       // Verificar se o veículo já tem um ID salvo
       const savedData = localStorage.getItem(`vehicle-${vehicle.id}`)
       let id = vehicle.id
@@ -48,10 +50,15 @@ export default function QRCodeGenerator({
       }
       
       setVehicleId(id)
+    } catch (error) {
+      console.error('Erro ao gerar ID do veículo:', error)
+      setVehicleId(vehicle.id)
     }
   }, [vehicle])
 
   const generateQRCode = useCallback(async () => {
+    if (typeof window === 'undefined') return
+
     try {
       setError('')
       

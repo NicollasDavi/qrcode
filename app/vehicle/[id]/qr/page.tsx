@@ -16,13 +16,20 @@ export default function QRCodePage() {
   const [size, setSize] = useState(300)
 
   useEffect(() => {
-    const savedVehicles = localStorage.getItem('vehicles')
-    if (savedVehicles) {
-      const vehicles: Vehicle[] = JSON.parse(savedVehicles)
-      const foundVehicle = vehicles.find(v => v.id === vehicleId)
-      if (foundVehicle) {
-        setVehicle(foundVehicle)
+    // Garantir que está no cliente
+    if (typeof window === 'undefined') return
+
+    try {
+      const savedVehicles = localStorage.getItem('vehicles')
+      if (savedVehicles) {
+        const vehicles: Vehicle[] = JSON.parse(savedVehicles)
+        const foundVehicle = vehicles.find(v => v.id === vehicleId)
+        if (foundVehicle) {
+          setVehicle(foundVehicle)
+        }
       }
+    } catch (error) {
+      console.error('Erro ao carregar veículo:', error)
     }
   }, [vehicleId])
 

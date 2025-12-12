@@ -23,24 +23,31 @@ export default function HistoryPage() {
   })
 
   useEffect(() => {
-    const savedVehicles = localStorage.getItem('vehicles')
-    if (savedVehicles) {
-      const vehicles: Vehicle[] = JSON.parse(savedVehicles)
-      const foundVehicle = vehicles.find(v => v.id === vehicleId)
-      if (foundVehicle) {
-        setVehicle(foundVehicle)
-      }
-    }
+    // Garantir que está no cliente
+    if (typeof window === 'undefined') return
 
-    const savedData = localStorage.getItem(`vehicle-data-${vehicleId}`)
-    if (savedData) {
-      try {
-        const data: VehicleMaintenanceData = JSON.parse(savedData)
-        setMaintenances(data.maintenances || [])
-        setFilteredMaintenances(data.maintenances || [])
-      } catch (e) {
-        console.error('Erro ao carregar manutenções:', e)
+    try {
+      const savedVehicles = localStorage.getItem('vehicles')
+      if (savedVehicles) {
+        const vehicles: Vehicle[] = JSON.parse(savedVehicles)
+        const foundVehicle = vehicles.find(v => v.id === vehicleId)
+        if (foundVehicle) {
+          setVehicle(foundVehicle)
+        }
       }
+
+      const savedData = localStorage.getItem(`vehicle-data-${vehicleId}`)
+      if (savedData) {
+        try {
+          const data: VehicleMaintenanceData = JSON.parse(savedData)
+          setMaintenances(data.maintenances || [])
+          setFilteredMaintenances(data.maintenances || [])
+        } catch (e) {
+          console.error('Erro ao carregar manutenções:', e)
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error)
     }
   }, [vehicleId])
 

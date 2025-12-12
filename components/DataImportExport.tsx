@@ -9,19 +9,26 @@ interface DataImportExportProps {
 
 export default function DataImportExport({ vehicleId, onDataImported }: DataImportExportProps) {
   const handleExport = () => {
-    const savedData = localStorage.getItem(`vehicle-data-${vehicleId}`)
-    if (savedData) {
-      const data: VehicleMaintenanceData = JSON.parse(savedData)
-      const jsonString = JSON.stringify(data, null, 2)
-      const blob = new Blob([jsonString], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `veiculo-${data.vehicle.plate}-${new Date().toISOString().split('T')[0]}.json`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
+    if (typeof window === 'undefined') return
+
+    try {
+      const savedData = localStorage.getItem(`vehicle-data-${vehicleId}`)
+      if (savedData) {
+        const data: VehicleMaintenanceData = JSON.parse(savedData)
+        const jsonString = JSON.stringify(data, null, 2)
+        const blob = new Blob([jsonString], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `veiculo-${data.vehicle.plate}-${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+      }
+    } catch (error) {
+      console.error('Erro ao exportar dados:', error)
+      alert('Erro ao exportar dados. Tente novamente.')
     }
   }
 
@@ -37,21 +44,31 @@ export default function DataImportExport({ vehicleId, onDataImported }: DataImpo
         
         // Validar estrutura
         if (data.vehicle && Array.isArray(data.maintenances)) {
-          // Salvar dados do veículo
-          localStorage.setItem(`vehicle-data-${vehicleId}`, JSON.stringify(data))
-          
-          // Adicionar veículo à lista de veículos se não existir
-          const savedVehicles = localStorage.getItem('vehicles')
-          let vehicles = savedVehicles ? JSON.parse(savedVehicles) : []
-          
-          const vehicleExists = vehicles.some((v: any) => v.id === vehicleId)
-          if (!vehicleExists) {
-            vehicles.push(data.vehicle)
-            localStorage.setItem('vehicles', JSON.stringify(vehicles))
+          if (typeof window === 'undefined') {
+            alert('Erro: não é possível importar no servidor')
+            return
           }
-          
-          onDataImported(data)
-          alert('Dados importados com sucesso!')
+
+          try {
+            // Salvar dados do veículo
+            localStorage.setItem(`vehicle-data-${vehicleId}`, JSON.stringify(data))
+            
+            // Adicionar veículo à lista de veículos se não existir
+            const savedVehicles = localStorage.getItem('vehicles')
+            let vehicles = savedVehicles ? JSON.parse(savedVehicles) : []
+            
+            const vehicleExists = vehicles.some((v: any) => v.id === vehicleId)
+            if (!vehicleExists) {
+              vehicles.push(data.vehicle)
+              localStorage.setItem('vehicles', JSON.stringify(vehicles))
+            }
+            
+            onDataImported(data)
+            alert('Dados importados com sucesso!')
+          } catch (error) {
+            console.error('Erro ao importar dados:', error)
+            alert('Erro ao importar dados. Tente novamente.')
+          }
         } else {
           alert('Arquivo inválido. O arquivo deve conter dados de manutenção de veículo.')
         }

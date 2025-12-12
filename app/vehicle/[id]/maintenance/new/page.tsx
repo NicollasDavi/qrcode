@@ -13,63 +13,75 @@ export default function NewMaintenancePage() {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null)
 
   useEffect(() => {
-    const savedVehicles = localStorage.getItem('vehicles')
-    if (savedVehicles) {
-      const vehicles: Vehicle[] = JSON.parse(savedVehicles)
-      const foundVehicle = vehicles.find(v => v.id === vehicleId)
-      if (foundVehicle) {
-        setVehicle(foundVehicle)
+    // Garantir que está no cliente
+    if (typeof window === 'undefined') return
+
+    try {
+      const savedVehicles = localStorage.getItem('vehicles')
+      if (savedVehicles) {
+        const vehicles: Vehicle[] = JSON.parse(savedVehicles)
+        const foundVehicle = vehicles.find(v => v.id === vehicleId)
+        if (foundVehicle) {
+          setVehicle(foundVehicle)
+        }
       }
+    } catch (error) {
+      console.error('Erro ao carregar veículo:', error)
     }
   }, [vehicleId])
 
   const handleAddMaintenance = (maintenance: Maintenance) => {
-    if (!vehicle) return
+    if (!vehicle || typeof window === 'undefined') return
 
-    // Carregar manutenções existentes
-    const savedData = localStorage.getItem(`vehicle-data-${vehicleId}`)
-    let maintenances: Maintenance[] = []
+    try {
+      // Carregar manutenções existentes
+      const savedData = localStorage.getItem(`vehicle-data-${vehicleId}`)
+      let maintenances: Maintenance[] = []
 
-    if (savedData) {
-      try {
-        const data: VehicleMaintenanceData = JSON.parse(savedData)
-        maintenances = data.maintenances || []
-      } catch (e) {
-        console.error('Erro ao carregar manutenções:', e)
+      if (savedData) {
+        try {
+          const data: VehicleMaintenanceData = JSON.parse(savedData)
+          maintenances = data.maintenances || []
+        } catch (e) {
+          console.error('Erro ao carregar manutenções:', e)
+        }
       }
-    }
 
-    // Adicionar nova manutenção
-    const updatedMaintenances = [...maintenances, maintenance]
+      // Adicionar nova manutenção
+      const updatedMaintenances = [...maintenances, maintenance]
 
-    // Atualizar quilometragem do veículo se necessário
-    if (maintenance.mileage > vehicle.currentMileage) {
-      const updatedVehicles = JSON.parse(localStorage.getItem('vehicles') || '[]')
-      const vehicleIndex = updatedVehicles.findIndex((v: Vehicle) => v.id === vehicleId)
-      if (vehicleIndex !== -1) {
-        updatedVehicles[vehicleIndex].currentMileage = maintenance.mileage
-        updatedVehicles[vehicleIndex].lastUpdated = new Date().toISOString()
-        localStorage.setItem('vehicles', JSON.stringify(updatedVehicles))
+      // Atualizar quilometragem do veículo se necessário
+      if (maintenance.mileage > vehicle.currentMileage) {
+        const updatedVehicles = JSON.parse(localStorage.getItem('vehicles') || '[]')
+        const vehicleIndex = updatedVehicles.findIndex((v: Vehicle) => v.id === vehicleId)
+        if (vehicleIndex !== -1) {
+          updatedVehicles[vehicleIndex].currentMileage = maintenance.mileage
+          updatedVehicles[vehicleIndex].lastUpdated = new Date().toISOString()
+          localStorage.setItem('vehicles', JSON.stringify(updatedVehicles))
+        }
       }
+
+      // Salvar dados
+      const vehicleData: VehicleMaintenanceData = {
+        vehicle: {
+          ...vehicle,
+          currentMileage: Math.max(vehicle.currentMileage, maintenance.mileage),
+        },
+        maintenances: updatedMaintenances,
+        createdAt: vehicle.createdAt,
+        lastUpdated: new Date().toISOString(),
+        version: '1.0',
+      }
+
+      localStorage.setItem(`vehicle-data-${vehicleId}`, JSON.stringify(vehicleData))
+      localStorage.setItem(`vehicle-${vehicleId}`, JSON.stringify(vehicleData))
+
+      // Redirecionar para o dashboard
+      router.push(`/vehicle/${vehicleId}`)
+    } catch (error) {
+      console.error('Erro ao salvar manutenção:', error)
+      alert('Erro ao salvar manutenção. Tente novamente.')
     }
-
-    // Salvar dados
-    const vehicleData: VehicleMaintenanceData = {
-      vehicle: {
-        ...vehicle,
-        currentMileage: Math.max(vehicle.currentMileage, maintenance.mileage),
-      },
-      maintenances: updatedMaintenances,
-      createdAt: vehicle.createdAt,
-      lastUpdated: new Date().toISOString(),
-      version: '1.0',
-    }
-
-    localStorage.setItem(`vehicle-data-${vehicleId}`, JSON.stringify(vehicleData))
-    localStorage.setItem(`vehicle-${vehicleId}`, JSON.stringify(vehicleData))
-
-    // Redirecionar para o dashboard
-    router.push(`/vehicle/${vehicleId}`)
   }
 
   if (!vehicle) {
