@@ -53,12 +53,20 @@ export default function Dashboard({
             </h2>
             <p className="text-gray-600">{vehicle.year} • {vehicle.plate}</p>
           </div>
-          <Link
-            href={`/vehicle/${vehicle.id}/qr`}
-            className="px-4 py-2 bg-[#1B3A4B] hover:bg-[#1a3342] text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            Ver QR Code
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href={`/vehicle/${vehicle.id}/qr`}
+              className="px-4 py-2 bg-[#1B3A4B] hover:bg-[#1a3342] text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              Ver QR Code
+            </Link>
+            <Link
+              href="/scan"
+              className="px-4 py-2 bg-white hover:bg-gray-50 text-[#1B3A4B] text-sm font-medium rounded-lg border border-[#1B3A4B] transition-colors"
+            >
+              Ler QR Code
+            </Link>
+          </div>
         </div>
       </div>
 
