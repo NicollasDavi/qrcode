@@ -18,8 +18,12 @@ export default function QRCodeScanner() {
 
   useEffect(() => {
     return () => {
+      // Cleanup ao desmontar o componente
       if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {})
+        scannerRef.current.stop().catch(() => {
+          // Ignorar erros no cleanup
+        })
+        scannerRef.current = null
       }
     }
   }, [])
@@ -120,11 +124,28 @@ export default function QRCodeScanner() {
   }
 
   const startScanning = async () => {
+    // Parar scanner anterior se existir
+    if (scannerRef.current) {
+      try {
+        await stopScanning()
+      } catch (e) {
+        // Ignorar erros ao parar scanner anterior
+      }
+    }
+
     try {
       setError('')
       setResult('')
       setMaintenanceData(null)
+      setScannedVehicleId(null)
       
+      // Verificar se o elemento existe
+      const containerElement = document.getElementById('scanner-container')
+      if (!containerElement) {
+        setError('Elemento do scanner não encontrado')
+        return
+      }
+
       const scanner = new Html5Qrcode('scanner-container')
       scannerRef.current = scanner
 
@@ -135,8 +156,14 @@ export default function QRCodeScanner() {
           qrbox: { width: 250, height: 250 },
         },
         (decodedText) => {
-          parseQRCodeResult(decodedText)
-          stopScanning()
+          // Processar resultado
+          const success = parseQRCodeResult(decodedText)
+          if (success) {
+            // Parar após ler com sucesso (com delay para evitar race conditions)
+            setTimeout(async () => {
+              await stopScanning()
+            }, 500)
+          }
         },
         (errorMessage) => {
           // Ignora erros de leitura contínua
@@ -147,20 +174,51 @@ export default function QRCodeScanner() {
     } catch (err: any) {
       setError('Erro ao iniciar a câmera. Verifique as permissões.')
       console.error(err)
+      setScanning(false)
+      scannerRef.current = null
     }
   }
 
   const stopScanning = async () => {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop()
-        scannerRef.current.clear()
-      } catch (err) {
-        console.error(err)
-      }
-      scannerRef.current = null
+    if (!scannerRef.current) {
+      setScanning(false)
+      return
     }
+
+    const scanner = scannerRef.current
+    scannerRef.current = null // Limpar referência primeiro para evitar chamadas duplicadas
     setScanning(false)
+
+    try {
+      // Verificar se o elemento ainda existe no DOM
+      const containerElement = document.getElementById('scanner-container')
+      if (!containerElement) {
+        // Elemento já foi removido, não precisa parar
+        return
+      }
+
+      await scanner.stop()
+    } catch (err: any) {
+      // Ignorar erros específicos relacionados a elementos já removidos ou câmera já parada
+      const errorMessage = err?.message || err?.toString() || ''
+      if (
+        errorMessage.includes('removeChild') ||
+        errorMessage.includes('not a child') ||
+        errorMessage.includes('AbortError') ||
+        errorMessage.includes('media was removed') ||
+        errorMessage.includes('camera already stopped')
+      ) {
+        // Erros esperados - ignorar silenciosamente
+        return
+      }
+      console.error('Erro ao parar scanner:', err)
+    } finally {
+      try {
+        scanner.clear()
+      } catch (clearError) {
+        // Ignorar erros ao limpar (pode já estar limpo)
+      }
+    }
   }
 
   const copyToClipboard = () => {
