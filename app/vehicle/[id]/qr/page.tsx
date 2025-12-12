@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import QRCode from 'qrcode'
 import { Vehicle } from '@/types/maintenance'
 import DataImportExport from '@/components/DataImportExport'
@@ -26,13 +26,7 @@ export default function QRCodePage() {
     }
   }, [vehicleId])
 
-  useEffect(() => {
-    if (vehicle) {
-      generateQRCode()
-    }
-  }, [vehicle, size])
-
-  const generateQRCode = async () => {
+  const generateQRCode = useCallback(async () => {
     if (!vehicle) return
 
     try {
@@ -58,7 +52,13 @@ export default function QRCodePage() {
     } catch (err) {
       console.error('Erro ao gerar QR code:', err)
     }
-  }
+  }, [vehicle, size])
+
+  useEffect(() => {
+    if (vehicle) {
+      generateQRCode()
+    }
+  }, [vehicle, size, generateQRCode])
 
   const downloadQRCode = () => {
     if (qrCodeUrl) {
